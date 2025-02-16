@@ -313,17 +313,17 @@ function StereoAudioRecorder(mediaStream, config) {
 
             var index = currentOffset;
             if (bytesPerSample === 2) {
-            // write the PCM samples
-            var lng = interleavedLength;
+                // write the PCM samples
+                var lng = interleavedLength;
                 var index = currentOffset;
-            var volume = 1;
-            for (var i = 0; i < lng; i++) {
+                var volume = 1;
+                for (var i = 0; i < lng; i++) {
                     view.setInt16(
                         index,
                         interleaved[i] * (0x7fff * volume),
                         true
                     );
-                index += 2;
+                    index += 2;
                 }
             } else if (bytesPerSample === 4) {
                 // Now, write the Float32 samples directly:
