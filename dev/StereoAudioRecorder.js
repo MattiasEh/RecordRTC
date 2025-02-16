@@ -71,8 +71,8 @@ function StereoAudioRecorder(mediaStream, config) {
         console.log('StereoAudioRecorder is set to record number of channels: ' + numberOfAudioChannels);
     }
 
-    // if any Track within the MediaStream is muted or not enabled at any time, 
-    // the browser will only record black frames 
+    // if any Track within the MediaStream is muted or not enabled at any time,
+    // the browser will only record black frames
     // or silence since that is the content produced by the Track
     // so we need to stopRecording as soon as any single track ends.
     if (typeof config.checkForInactiveTracks === 'undefined') {
@@ -225,61 +225,116 @@ function StereoAudioRecorder(mediaStream, config) {
             var interleavedLength = interleaved.length;
 
             // create wav file
-            var resultingBufferLength = 44 + interleavedLength * 2;
+            console.log('Creating wav file...');
+
+            //
+            // Excellent resource on WAV header format: https://wavefilegem.com/how_wave_files_work.html
+            //
+
+            // TODO: make conditional.
+            //const wavFormat = 1; // Integer PCM
+            //const bytesPerSample = 2;
+            //const writeExtensionSize = false;
+            var wavFormat = 3; // Floating Point PCM
+            var bytesPerSample = 4;
+            var writeExtensionSize = true;
+            var extensionSize = 0;
+
+            var headerExtensionLength = writeExtensionSize ? 2 : 0;
+            var headerBufferLength = 44 + headerExtensionLength;
+            var dataBufferLength = interleavedLength * bytesPerSample;
+            var resultingBufferLength = headerBufferLength + dataBufferLength;
 
             var buffer = new ArrayBuffer(resultingBufferLength);
 
             var view = new DataView(buffer);
 
-            // RIFF chunk descriptor/identifier 
+            // RIFF chunk descriptor/identifier
             writeUTFBytes(view, 0, 'RIFF');
 
             // RIFF chunk length
             // changed "44" to "36" via #401
-            view.setUint32(4, 36 + interleavedLength * 2, true);
+            // We need to EXCLUDE the 4 bytes for the "RIFF" identifier and these 4 bytes for the chunk length.
+            view.setUint32(4, resultingBufferLength - 8, true);
 
-            // RIFF type 
+            // RIFF type
             writeUTFBytes(view, 8, 'WAVE');
 
-            // format chunk identifier 
+            // format chunk identifier
             // FMT sub-chunk
             writeUTFBytes(view, 12, 'fmt ');
 
-            // format chunk length 
-            view.setUint32(16, 16, true);
+            // format chunk length
+            view.setUint32(16, 16 + headerExtensionLength, true);
 
+            // Format Tag
             // sample format (raw)
-            view.setUint16(20, 1, true);
+            view.setUint16(20, wavFormat, true);
 
             // stereo (2 channels)
             view.setUint16(22, numberOfAudioChannels, true);
 
-            // sample rate 
+            // sample rate
             view.setUint32(24, sampleRate, true);
 
             // byte rate (sample rate * block align)
-            view.setUint32(28, sampleRate * numberOfAudioChannels * 2, true);
+            view.setUint32(
+                28,
+                sampleRate * numberOfAudioChannels * bytesPerSample,
+                true
+            );
 
-            // block align (channel count * bytes per sample) 
-            view.setUint16(32, numberOfAudioChannels * 2, true);
+            // block align (channel count * bytes per sample)
+            view.setUint16(32, numberOfAudioChannels * bytesPerSample, true);
 
-            // bits per sample 
-            view.setUint16(34, 16, true);
+            // bits per sample
+            view.setUint16(34, 8 * bytesPerSample, true);
+
+            var currentOffset = 36;
+
+            // Extension size -- ONLY IF FORMAT TAG IS NOT 1!
+            if (writeExtensionSize) {
+                view.setUint16(currentOffset, extensionSize, true);
+                currentOffset += 2;
+            }
 
             // data sub-chunk
-            // data chunk identifier 
-            writeUTFBytes(view, 36, 'data');
+            // data chunk identifier
+            writeUTFBytes(view, currentOffset, 'data');
+            currentOffset += 4;
 
-            // data chunk length 
-            view.setUint32(40, interleavedLength * 2, true);
+            // data chunk length
+            view.setUint32(
+                currentOffset,
+                interleavedLength * bytesPerSample,
+                true
+            );
+            currentOffset += 4;
 
+            var index = currentOffset;
+            if (bytesPerSample === 2) {
             // write the PCM samples
             var lng = interleavedLength;
-            var index = 44;
+                var index = currentOffset;
             var volume = 1;
             for (var i = 0; i < lng; i++) {
-                view.setInt16(index, interleaved[i] * (0x7FFF * volume), true);
+                    view.setInt16(
+                        index,
+                        interleaved[i] * (0x7fff * volume),
+                        true
+                    );
                 index += 2;
+                }
+            } else if (bytesPerSample === 4) {
+                // Now, write the Float32 samples directly:
+                var index = currentOffset;
+                var lng = interleavedLength;
+                for (var i = 0; i < lng; i++) {
+                    view.setFloat32(index, interleaved[i], true);
+                    index += 4;
+                }
+            } else {
+                throw 'Only 16-bit and 32-bit audio are supported.';
             }
 
             if (cb) {
