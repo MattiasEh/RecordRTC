@@ -1,6 +1,6 @@
 'use strict';
 
-// Last time updated: 2025-02-16 7:55:20 PM UTC
+// Last time updated: 2025-02-16 8:31:06 PM UTC
 
 // ________________
 // RecordRTC v5.6.3
@@ -2805,26 +2805,22 @@ function StereoAudioRecorder(mediaStream, config) {
             currentOffset += 4;
 
             // data chunk length
-            view.setUint32(
-                currentOffset,
-                interleavedLength * bytesPerSample,
-                true
-            );
+            view.setUint32(currentOffset, dataBufferLength, true);
             currentOffset += 4;
 
             var index = currentOffset;
             if (bytesPerSample === 2) {
-            // write the PCM samples
-            var lng = interleavedLength;
+                // write the PCM samples
+                var lng = interleavedLength;
                 var index = currentOffset;
-            var volume = 1;
-            for (var i = 0; i < lng; i++) {
+                var volume = 1;
+                for (var i = 0; i < lng; i++) {
                     view.setInt16(
                         index,
                         interleaved[i] * (0x7fff * volume),
                         true
                     );
-                index += 2;
+                    index += 2;
                 }
             } else if (bytesPerSample === 4) {
                 // Now, write the Float32 samples directly:
@@ -2835,7 +2831,7 @@ function StereoAudioRecorder(mediaStream, config) {
                     index += 4;
                 }
             } else {
-                throw 'Only 16-bit and 32-bit audio are supported.';
+                throw 'Only 16-bit integer and 32-bit floating-point WAV audio are supported.';
             }
 
             if (cb) {

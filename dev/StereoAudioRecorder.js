@@ -304,11 +304,7 @@ function StereoAudioRecorder(mediaStream, config) {
             currentOffset += 4;
 
             // data chunk length
-            view.setUint32(
-                currentOffset,
-                interleavedLength * bytesPerSample,
-                true
-            );
+            view.setUint32(currentOffset, dataBufferLength, true);
             currentOffset += 4;
 
             var index = currentOffset;
@@ -334,7 +330,7 @@ function StereoAudioRecorder(mediaStream, config) {
                     index += 4;
                 }
             } else {
-                throw 'Only 16-bit and 32-bit audio are supported.';
+                throw 'Only 16-bit integer and 32-bit floating-point WAV audio are supported.';
             }
 
             if (cb) {
