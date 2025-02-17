@@ -452,6 +452,41 @@ function StereoAudioRecorder(mediaStream, config) {
         });
     };
 
+    /**
+     * The sample rate (in sample-frames per second) at which the
+     * AudioContext handles audio. It is assumed that all AudioNodes
+     * in the context run at this rate. In making this assumption,
+     * sample-rate converters or "varispeed" processors are not supported
+     * in real-time processing.
+     * The sampleRate parameter describes the sample-rate of the
+     * linear PCM audio data in the buffer in sample-frames per second.
+     * An implementation must support sample-rates in at least
+     * the range 22050 to 96000.
+     * @property {number} sampleRate - Buffer-size for how frequently the audioprocess event is dispatched.
+     * @memberof StereoAudioRecorder
+     * @example
+     * recorder = new StereoAudioRecorder(mediaStream, {
+     *     sampleRate: 44100
+     * });
+     */
+    console.log('config.sampleRate', config ? config.sampleRate : 'undefined');
+    console.log('context.sampleRate', context ? context.sampleRate : 'undefined');
+    var sampleRate = typeof config.sampleRate !== 'undefined' ? config.sampleRate : context.sampleRate || 44100;
+    console.log('sampleRate', sampleRate);
+
+    if (sampleRate < 22050 || sampleRate > 96000) {
+        // Ref: http://stackoverflow.com/a/26303918/552182
+        if (!config.disableLogs) {
+            console.log('sample-rate must be under range 22050 and 96000.');
+        }
+    }
+
+    if (!config.disableLogs) {
+        if (config.desiredSampRate) {
+            console.log('Desired sample-rate: ' + config.desiredSampRate);
+        }
+    }
+
     if (typeof RecordRTC.Storage === 'undefined') {
         RecordRTC.Storage = {
             AudioContextConstructor: null,
@@ -459,8 +494,13 @@ function StereoAudioRecorder(mediaStream, config) {
         };
     }
 
+    // REVIEW: Do we also need to pass the number of channels?
+    console.log('Constructing AudioContext with sampleRate', sampleRate);
+
     if (!RecordRTC.Storage.AudioContextConstructor || RecordRTC.Storage.AudioContextConstructor.state === 'closed') {
-        RecordRTC.Storage.AudioContextConstructor = new RecordRTC.Storage.AudioContext();
+        RecordRTC.Storage.AudioContextConstructor = new RecordRTC.Storage.AudioContext({
+            sampleRate: sampleRate
+        });
     }
 
     var context = RecordRTC.Storage.AudioContextConstructor;
@@ -510,37 +550,6 @@ function StereoAudioRecorder(mediaStream, config) {
         bufferSize = jsAudioNode.bufferSize; // device buffer-size
     }
 
-    /**
-     * The sample rate (in sample-frames per second) at which the
-     * AudioContext handles audio. It is assumed that all AudioNodes
-     * in the context run at this rate. In making this assumption,
-     * sample-rate converters or "varispeed" processors are not supported
-     * in real-time processing.
-     * The sampleRate parameter describes the sample-rate of the
-     * linear PCM audio data in the buffer in sample-frames per second.
-     * An implementation must support sample-rates in at least
-     * the range 22050 to 96000.
-     * @property {number} sampleRate - Buffer-size for how frequently the audioprocess event is dispatched.
-     * @memberof StereoAudioRecorder
-     * @example
-     * recorder = new StereoAudioRecorder(mediaStream, {
-     *     sampleRate: 44100
-     * });
-     */
-    var sampleRate = typeof config.sampleRate !== 'undefined' ? config.sampleRate : context.sampleRate || 44100;
-
-    if (sampleRate < 22050 || sampleRate > 96000) {
-        // Ref: http://stackoverflow.com/a/26303918/552182
-        if (!config.disableLogs) {
-            console.log('sample-rate must be under range 22050 and 96000.');
-        }
-    }
-
-    if (!config.disableLogs) {
-        if (config.desiredSampRate) {
-            console.log('Desired sample-rate: ' + config.desiredSampRate);
-        }
-    }
 
     var isPaused = false;
     /**
@@ -679,6 +688,9 @@ function StereoAudioRecorder(mediaStream, config) {
             }
         }
 
+        // This is WAY too chatty, but I needed to see it:
+        //console.log('e.inputBuffer.sampleRate', e.inputBuffer.sampleRate);
+        // Works!
         var left = e.inputBuffer.getChannelData(0);
 
         // we clone the samples
